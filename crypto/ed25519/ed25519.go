@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"golang.org/x/crypto/ed25519"
+	"github.com/oasisprotocol/ed25519"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/tmhash"
