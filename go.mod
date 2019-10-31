@@ -49,6 +49,7 @@ require (
 	github.com/go-git/go-git/v5 v5.13.0
 	github.com/golang/protobuf v1.5.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
+	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e
 	golang.org/x/sync v0.10.0
 	gonum.org/v1/gonum v0.15.1
 	google.golang.org/protobuf v1.36.1
