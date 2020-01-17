@@ -53,6 +53,7 @@ require (
 	github.com/cosmos/gogoproto v1.4.1
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e
+	github.com/oasisprotocol/safeopen v0.0.0-20200528085122-e01cfdfc7661
 	github.com/vektra/mockery/v2 v2.14.0
 	gonum.org/v1/gonum v0.8.2
 	google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
@@ -85,6 +86,7 @@ require (
 	github.com/bufbuild/connect-go v1.0.0 // indirect
 	github.com/butuzov/ireturn v0.1.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/charithe/durationcheck v0.0.9 // indirect
