@@ -50,6 +50,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e
+	github.com/oasisprotocol/safeopen v0.0.0-20200528085122-e01cfdfc7661
 	golang.org/x/sync v0.10.0
 	gonum.org/v1/gonum v0.15.1
 	google.golang.org/protobuf v1.36.1
@@ -63,6 +64,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
