@@ -1011,6 +1011,11 @@ func NewNodeWithContext(ctx context.Context,
 
 	transport, peerFilters := createTransport(config, nodeInfo, nodeKey, proxyApp)
 
+	fdReclaimer := &nodeFDReclaimer{
+		transport: transport,
+	}
+	consensusState.SetFDReclaimer(fdReclaimer)
+
 	p2pLogger := logger.With("module", "p2p")
 	sw := createSwitch(
 		config, transport, p2pMetrics, peerFilters, mempoolReactor, bcReactor,
@@ -1649,4 +1654,12 @@ func splitAndTrimEmpty(s, sep, cutset string) []string {
 		}
 	}
 	return nonEmptyStrings
+}
+
+type nodeFDReclaimer struct {
+	transport *p2p.MultiplexTransport
+}
+
+func (r *nodeFDReclaimer) Reclaim() {
+	r.transport.FlushIncomingConnections()
 }
