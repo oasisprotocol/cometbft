@@ -5,20 +5,18 @@ package batchsig
 import (
 	"fmt"
 
-	"github.com/oasisprotocol/ed25519"
+	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 
 	"github.com/cometbft/cometbft/crypto"
 	tmEd25519 "github.com/cometbft/cometbft/crypto/ed25519"
 )
-
-var defaultOptions ed25519.Options
 
 // VerifyBatch verifies signatures in bulk.  Note that this call is only
 // faster than calling VerifyBytes for each signature iff every signature
 // is valid.
 func VerifyBatch(pubKeys []crypto.PubKey, msgs, sigs [][]byte) ([]bool, error) {
 	if len(pubKeys) != len(msgs) || len(msgs) != len(sigs) {
-		return nil, fmt.Errorf("tendermint/crypto/ed25519: parameter size mismatch")
+		return nil, fmt.Errorf("tendermint/crypto/batchsig: parameter size mismatch")
 	}
 
 	// Currently only Ed25519 supports batch verification.
@@ -39,7 +37,7 @@ func VerifyBatch(pubKeys []crypto.PubKey, msgs, sigs [][]byte) ([]bool, error) {
 	if tmEd25519.OasisDomainSeparationEnabled() {
 		validSigs, err = tmEd25519.OasisVerifyBatchContext(nativePubKeys, msgs, sigs)
 	} else {
-		_, validSigs, err = ed25519.VerifyBatch(nil, nativePubKeys, msgs, sigs, &defaultOptions)
+		validSigs, err = tmEd25519.VerifyBatch(nativePubKeys, msgs, sigs)
 	}
 	return validSigs, err
 }
