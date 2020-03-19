@@ -52,7 +52,7 @@ require (
 	github.com/cometbft/cometbft-db v0.7.0
 	github.com/cosmos/gogoproto v1.4.1
 	github.com/go-git/go-git/v5 v5.5.2
-	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e
+	github.com/oasisprotocol/curve25519-voi v0.0.0-20210609091139-0a56a4bca00b
 	github.com/oasisprotocol/safeopen v0.0.0-20200528085122-e01cfdfc7661
 	github.com/vektra/mockery/v2 v2.14.0
 	gonum.org/v1/gonum v0.8.2
