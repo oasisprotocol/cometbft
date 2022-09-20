@@ -962,6 +962,7 @@ func NewNodeWithContext(ctx context.Context,
 		proxyApp.Consensus(),
 		mempool,
 		evidencePool,
+		blockStore,
 		sm.BlockExecutorWithMetrics(smMetrics),
 	)
 	offlineStateSyncHeight := int64(0)
