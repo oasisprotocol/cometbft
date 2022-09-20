@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	dbm "github.com/cometbft/cometbft-db"
 	abciclientmocks "github.com/cometbft/cometbft/abci/client/mocks"
 	abci "github.com/cometbft/cometbft/abci/types"
 	abcimocks "github.com/cometbft/cometbft/abci/types/mocks"
@@ -25,6 +26,7 @@ import (
 	pmocks "github.com/cometbft/cometbft/proxy/mocks"
 	sm "github.com/cometbft/cometbft/state"
 	"github.com/cometbft/cometbft/state/mocks"
+	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/cometbft/cometbft/version"
@@ -47,6 +49,8 @@ func TestApplyBlock(t *testing.T) {
 	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 		DiscardABCIResponses: false,
 	})
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
+
 	mp := &mpmocks.Mempool{}
 	mp.On("Lock").Return()
 	mp.On("Unlock").Return()
@@ -59,16 +63,15 @@ func TestApplyBlock(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 	blockExec := sm.NewBlockExecutor(stateStore, log.TestingLogger(), proxyApp.Consensus(),
-		mp, sm.EmptyEvidencePool{})
+		mp, sm.EmptyEvidencePool{}, blockStore)
 
 	block := makeBlock(state, 1, new(types.Commit))
 	bps, err := block.MakePartSet(testPartSize)
 	require.NoError(t, err)
 	blockID := types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
 
-	state, retainHeight, err := blockExec.ApplyBlock(state, blockID, block)
+	state, err = blockExec.ApplyBlock(state, blockID, block)
 	require.Nil(t, err)
-	assert.EqualValues(t, retainHeight, 1)
 
 	// TODO check state and mempool
 	assert.EqualValues(t, 1, state.Version.Consensus.App, "App version wasn't updated")
@@ -231,8 +234,10 @@ func TestBeginBlockByzantineValidators(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
+
 	blockExec := sm.NewBlockExecutor(stateStore, log.TestingLogger(), proxyApp.Consensus(),
-		mp, evpool)
+		mp, evpool, blockStore)
 
 	block := makeBlock(state, 1, new(types.Commit))
 	block.Evidence = types.EvidenceData{Evidence: ev}
@@ -242,9 +247,8 @@ func TestBeginBlockByzantineValidators(t *testing.T) {
 
 	blockID = types.BlockID{Hash: block.Hash(), PartSetHeader: bps.Header()}
 
-	state, retainHeight, err := blockExec.ApplyBlock(state, blockID, block)
+	state, err = blockExec.ApplyBlock(state, blockID, block)
 	require.Nil(t, err)
-	assert.EqualValues(t, retainHeight, 1)
 
 	// TODO check state and mempool
 	assert.Equal(t, abciMb, app.Misbehavior)
@@ -268,7 +272,7 @@ func TestProcessProposal(t *testing.T) {
 	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 		DiscardABCIResponses: false,
 	})
-
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	eventBus := types.NewEventBus()
 	err = eventBus.Start()
 	require.NoError(t, err)
@@ -279,6 +283,7 @@ func TestProcessProposal(t *testing.T) {
 		proxyApp.Consensus(),
 		new(mpmocks.Mempool),
 		sm.EmptyEvidencePool{},
+		blockStore,
 	)
 
 	block0 := makeBlock(state, height-1, new(types.Commit))
@@ -488,12 +493,14 @@ func TestEndBlockValidatorUpdates(t *testing.T) {
 		mock.Anything).Return(nil)
 	mp.On("ReapMaxBytesMaxGas", mock.Anything, mock.Anything).Return(types.Txs{})
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		sm.EmptyEvidencePool{},
+		blockStore,
 	)
 
 	eventBus := types.NewEventBus()
@@ -522,7 +529,7 @@ func TestEndBlockValidatorUpdates(t *testing.T) {
 		{PubKey: pk, Power: 10},
 	}
 
-	state, _, err = blockExec.ApplyBlock(state, blockID, block)
+	state, err = blockExec.ApplyBlock(state, blockID, block)
 	require.Nil(t, err)
 	// test new validator was added to NextValidators
 	if assert.Equal(t, state.Validators.Size()+1, state.NextValidators.Size()) {
@@ -562,12 +569,14 @@ func TestEndBlockValidatorUpdatesResultingInEmptySet(t *testing.T) {
 	stateStore := sm.NewStore(stateDB, sm.StoreOptions{
 		DiscardABCIResponses: false,
 	})
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		new(mpmocks.Mempool),
 		sm.EmptyEvidencePool{},
+		blockStore,
 	)
 
 	block := makeBlock(state, 1, new(types.Commit))
@@ -582,7 +591,7 @@ func TestEndBlockValidatorUpdatesResultingInEmptySet(t *testing.T) {
 		{PubKey: vp, Power: 0},
 	}
 
-	assert.NotPanics(t, func() { state, _, err = blockExec.ApplyBlock(state, blockID, block) })
+	assert.NotPanics(t, func() { state, err = blockExec.ApplyBlock(state, blockID, block) })
 	assert.NotNil(t, err)
 	assert.NotEmpty(t, state.NextValidators.Validators)
 }
@@ -614,12 +623,14 @@ func TestEmptyPrepareProposal(t *testing.T) {
 		mock.Anything).Return(nil)
 	mp.On("ReapMaxBytesMaxGas", mock.Anything, mock.Anything).Return(types.Txs{})
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		sm.EmptyEvidencePool{},
+		blockStore,
 	)
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
@@ -655,12 +666,14 @@ func TestPrepareProposalTxsAllIncluded(t *testing.T) {
 	require.NoError(t, err)
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		evpool,
+		blockStore,
 	)
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
@@ -706,12 +719,14 @@ func TestPrepareProposalReorderTxs(t *testing.T) {
 	require.NoError(t, err)
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		evpool,
+		blockStore,
 	)
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
@@ -758,12 +773,14 @@ func TestPrepareProposalErrorOnTooManyTxs(t *testing.T) {
 	require.NoError(t, err)
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.NewNopLogger(),
 		proxyApp.Consensus(),
 		mp,
 		evpool,
+		blockStore,
 	)
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
@@ -812,12 +829,14 @@ func TestPrepareProposalCountSerializationOverhead(t *testing.T) {
 	require.NoError(t, err)
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.NewNopLogger(),
 		proxyApp.Consensus(),
 		mp,
 		evpool,
+		blockStore,
 	)
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)
@@ -859,12 +878,14 @@ func TestPrepareProposalErrorOnPrepareProposalError(t *testing.T) {
 	require.NoError(t, err)
 	defer proxyApp.Stop() //nolint:errcheck // ignore for tests
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.NewNopLogger(),
 		proxyApp.Consensus(),
 		mp,
 		evpool,
+		blockStore,
 	)
 	pa, _ := state.Validators.GetByIndex(0)
 	commit, err := makeValidCommit(height, types.BlockID{}, state.Validators, privVals)

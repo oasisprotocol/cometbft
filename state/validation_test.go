@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	dbm "github.com/cometbft/cometbft-db"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/ed25519"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -17,6 +18,7 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	sm "github.com/cometbft/cometbft/state"
 	"github.com/cometbft/cometbft/state/mocks"
+	"github.com/cometbft/cometbft/store"
 	"github.com/cometbft/cometbft/types"
 	cmttime "github.com/cometbft/cometbft/types/time"
 )
@@ -44,12 +46,15 @@ func TestValidateBlockHeader(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
+
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		sm.EmptyEvidencePool{},
+		blockStore,
 	)
 	lastCommit := types.NewCommit(0, 0, types.BlockID{}, nil)
 
@@ -129,12 +134,15 @@ func TestValidateBlockCommit(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
+
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		sm.EmptyEvidencePool{},
+		blockStore,
 	)
 	lastCommit := types.NewCommit(0, 0, types.BlockID{}, nil)
 	wrongSigsCommit := types.NewCommit(1, 0, types.BlockID{}, nil)
@@ -268,12 +276,15 @@ func TestValidateBlockEvidence(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 	state.ConsensusParams.Evidence.MaxBytes = 1000
+	blockStore := store.NewBlockStore(dbm.NewMemDB())
+
 	blockExec := sm.NewBlockExecutor(
 		stateStore,
 		log.TestingLogger(),
 		proxyApp.Consensus(),
 		mp,
 		evpool,
+		blockStore,
 	)
 	lastCommit := types.NewCommit(0, 0, types.BlockID{}, nil)
 
