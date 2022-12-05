@@ -73,6 +73,7 @@ func (c *Client) detectDivergence(ctx context.Context, primaryTrace []*types.Lig
 			}
 			// if attempt to generate conflicting headers failed then remove witness
 			witnessesToRemove = append(witnessesToRemove, e.WitnessIndex)
+			c.witnesses[e.WitnessIndex].MalevolentProvider(e.peer)
 
 		case errBadWitness:
 			// these are all melevolent errors and should result in removing the
@@ -80,6 +81,7 @@ func (c *Client) detectDivergence(ctx context.Context, primaryTrace []*types.Lig
 			c.logger.Info("witness returned an error during header comparison, removing...",
 				"witness", c.witnesses[e.WitnessIndex], "err", err)
 			witnessesToRemove = append(witnessesToRemove, e.WitnessIndex)
+			c.witnesses[e.WitnessIndex].MalevolentProvider(e.peer)
 		case ErrProposerPrioritiesDiverge:
 			c.logger.Info("witness reported validator set with different proposer priorities",
 				"witness", c.witnesses[e.WitnessIndex], "err", err)
@@ -123,7 +125,7 @@ func (c *Client) compareNewLightBlockWithWitness(ctx context.Context, errc chan 
 ) {
 	h := l.SignedHeader
 
-	lightBlock, err := witness.LightBlock(ctx, h.Height)
+	lightBlock, peer, err := witness.LightBlockWithPeerID(ctx, h.Height)
 	switch err {
 	// no error means we move on to checking the hash of the two headers
 	case nil:
@@ -157,7 +159,7 @@ func (c *Client) compareNewLightBlockWithWitness(ctx context.Context, errc chan 
 		// witness' last header is below the primary's header. We check the times to see if the blocks
 		// have conflicting times
 		if !lightBlock.Time.Before(h.Time) {
-			errc <- ErrConflictingHeaders{Block: lightBlock, WitnessIndex: witnessIndex}
+			errc <- ErrConflictingHeaders{Block: lightBlock, WitnessIndex: witnessIndex, peer: peer}
 			return
 		}
 
@@ -171,7 +173,7 @@ func (c *Client) compareNewLightBlockWithWitness(ctx context.Context, errc chan 
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				errc <- err
 			} else {
-				errc <- errBadWitness{Reason: err, WitnessIndex: witnessIndex}
+				errc <- errBadWitness{Reason: err, WitnessIndex: witnessIndex, peer: peer}
 			}
 			return
 		}
@@ -182,7 +184,7 @@ func (c *Client) compareNewLightBlockWithWitness(ctx context.Context, errc chan 
 		// the witness still doesn't have a block at the height of the primary.
 		// Check if there is a conflicting time
 		if !lightBlock.Time.Before(h.Time) {
-			errc <- ErrConflictingHeaders{Block: lightBlock, WitnessIndex: witnessIndex}
+			errc <- ErrConflictingHeaders{Block: lightBlock, WitnessIndex: witnessIndex, peer: peer}
 			return
 		}
 
@@ -199,12 +201,12 @@ func (c *Client) compareNewLightBlockWithWitness(ctx context.Context, errc chan 
 	default:
 		// all other errors (i.e. invalid block, closed connection or unreliable provider) we mark the
 		// witness as bad and remove it
-		errc <- errBadWitness{Reason: err, WitnessIndex: witnessIndex}
+		errc <- errBadWitness{Reason: err, WitnessIndex: witnessIndex, peer: peer}
 		return
 	}
 
 	if !bytes.Equal(h.Hash(), lightBlock.Hash()) {
-		errc <- ErrConflictingHeaders{Block: lightBlock, WitnessIndex: witnessIndex}
+		errc <- ErrConflictingHeaders{Block: lightBlock, WitnessIndex: witnessIndex, peer: peer}
 	}
 
 	// ProposerPriorityHash is not part of the header hash, so we need to check it separately.
