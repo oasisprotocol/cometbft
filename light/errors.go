@@ -81,6 +81,7 @@ var ErrNoWitnesses = errors.New("no witnesses connected. please reset light clie
 type errConflictingHeaders struct {
 	Block        *types.LightBlock
 	WitnessIndex int
+	peer         string
 }
 
 func (e errConflictingHeaders) Error() string {
@@ -94,6 +95,7 @@ func (e errConflictingHeaders) Error() string {
 type errBadWitness struct {
 	Reason       error
 	WitnessIndex int
+	peer         string
 }
 
 func (e errBadWitness) Error() string {
