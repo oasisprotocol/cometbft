@@ -107,6 +107,14 @@ func (p *Mock) ReportEvidence(_ context.Context, ev types.Evidence) error {
 	return nil
 }
 
+func (p *Mock) LightBlockWithPeerID(ctx context.Context, height int64) (*types.LightBlock, string, error) {
+	l, err := p.LightBlock(ctx, height)
+	return l, "", err
+}
+
+func (p *Mock) MalevolentProvider(peerID string) {
+}
+
 func (p *Mock) HasEvidence(ev types.Evidence) bool {
 	_, ok := p.evidenceToReport[string(ev.Hash())]
 	return ok

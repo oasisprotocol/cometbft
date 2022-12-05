@@ -107,6 +107,14 @@ func (p *http) ReportEvidence(ctx context.Context, ev types.Evidence) error {
 	return err
 }
 
+func (p *http) LightBlockWithPeerID(ctx context.Context, height int64) (*types.LightBlock, string, error) {
+	lb, err := p.LightBlock(ctx, height)
+	return lb, "", err
+}
+
+func (p *http) MalevolentProvider(peerID string) {
+}
+
 func (p *http) validatorSet(ctx context.Context, height *int64) (*types.ValidatorSet, error) {
 	// Since the malicious node could report a massive number of pages, making us
 	// spend a considerable time iterating, we restrict the number of pages here.
