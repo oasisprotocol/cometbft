@@ -125,6 +125,13 @@ func MaxBlockLag(d time.Duration) Option {
 	}
 }
 
+// DisableProviderRemoval disables the removal of misbehaving providers.
+func DisableProviderRemoval() Option {
+	return func(c *Client) {
+		c.disableProviderRemoval = true
+	}
+}
+
 // Client represents a light client, connected to a single chain, which gets
 // light blocks from a primary provider, verifies them either sequentially or by
 // skipping some and stores them in a trusted store (usually, a local FS).
@@ -145,6 +152,8 @@ type Client struct {
 	primary provider.Provider
 	// Providers used to "witness" new headers.
 	witnesses []provider.Provider
+
+	disableProviderRemoval bool
 
 	// Where trusted light blocks are stored.
 	trustedStore store.Store
@@ -748,7 +757,7 @@ func (c *Client) verifySkipping(
 			if depth == len(blockCache)-1 {
 				pivotHeight := verifiedBlock.Height + (blockCache[depth].Height-verifiedBlock.
 					Height)*verifySkippingNumerator/verifySkippingDenominator
-				interimBlock, providerErr := source.LightBlock(ctx, pivotHeight)
+				interimBlock, peer, providerErr := source.LightBlockWithPeerID(ctx, pivotHeight)
 				switch providerErr {
 				case nil:
 					blockCache = append(blockCache, interimBlock)
@@ -760,6 +769,7 @@ func (c *Client) verifySkipping(
 				// all other errors such as ErrBadLightBlock or ErrUnreliableProvider are seen as malevolent and the
 				// provider is removed
 				default:
+					source.MalevolentProvider(peer)
 					return nil, ErrVerificationFailed{From: verifiedBlock.Height, To: pivotHeight, Reason: providerErr}
 				}
 				blockCache = append(blockCache, interimBlock)
@@ -989,7 +999,7 @@ func (c *Client) backwards(
 //     any other error, the primary is permanently dropped and is replaced by a witness.
 func (c *Client) lightBlockFromPrimary(ctx context.Context, height int64) (*types.LightBlock, error) {
 	c.providerMutex.Lock()
-	l, err := c.primary.LightBlock(ctx, height)
+	l, peer, err := c.primary.LightBlockWithPeerID(ctx, height)
 	c.providerMutex.Unlock()
 
 	switch err {
@@ -1011,6 +1021,9 @@ func (c *Client) lightBlockFromPrimary(ctx context.Context, height int64) (*type
 		// These errors mean that the light client should drop the primary and try with another provider instead
 		c.logger.Info("error from light block request from primary, removing...",
 			"error", err, "height", height, "primary", c.primary)
+		c.providerMutex.Lock()
+		c.primary.MalevolentProvider(peer)
+		c.providerMutex.Unlock()
 		return c.findNewPrimary(ctx, height, true)
 	}
 }
@@ -1026,6 +1039,12 @@ func (c *Client) removeWitnesses(indexes []int) error {
 	// order so as to not affect the indexes themselves
 	sort.Ints(indexes)
 	for i := len(indexes) - 1; i >= 0; i-- {
+		// The primary needs to be removed even if disableProviderRemoval is enabled,
+		// because it has been copied into c.primary.
+		if c.witnesses[indexes[i]] != c.primary && c.disableProviderRemoval {
+			continue
+		}
+
 		c.witnesses[indexes[i]] = c.witnesses[len(c.witnesses)-1]
 		c.witnesses = c.witnesses[:len(c.witnesses)-1]
 	}
@@ -1036,6 +1055,7 @@ func (c *Client) removeWitnesses(indexes []int) error {
 type witnessResponse struct {
 	lb           *types.LightBlock
 	witnessIndex int
+	peer         string
 	err          error
 }
 
@@ -1044,6 +1064,10 @@ type witnessResponse struct {
 // entire removed or just appended to the back of the witnesses list. This method also handles witness
 // errors. If no witness is available, it returns the last error of the witness.
 func (c *Client) findNewPrimary(ctx context.Context, height int64, remove bool) (*types.LightBlock, error) {
+	if c.disableProviderRemoval {
+		remove = false
+	}
+
 	c.providerMutex.Lock()
 	defer c.providerMutex.Unlock()
 
@@ -1066,8 +1090,8 @@ func (c *Client) findNewPrimary(ctx context.Context, height int64, remove bool) 
 		go func(witnessIndex int, witnessResponsesC chan witnessResponse) {
 			defer wg.Done()
 
-			lb, err := c.witnesses[witnessIndex].LightBlock(subctx, height)
-			witnessResponsesC <- witnessResponse{lb, witnessIndex, err}
+			lb, peer, err := c.witnesses[witnessIndex].LightBlockWithPeerID(subctx, height)
+			witnessResponsesC <- witnessResponse{lb, witnessIndex, peer, err}
 		}(index, witnessResponsesC)
 	}
 
@@ -1115,6 +1139,7 @@ func (c *Client) findNewPrimary(ctx context.Context, height int64, remove bool) 
 			c.logger.Error("error on light block request from witness, removing...",
 				"error", response.err, "primary", c.witnesses[response.witnessIndex])
 			witnessesToRemove = append(witnessesToRemove, response.witnessIndex)
+			c.witnesses[response.witnessIndex].MalevolentProvider(response.peer)
 		}
 	}
 
@@ -1163,6 +1188,7 @@ and remove witness. Otherwise, use the different primary`, e.WitnessIndex), "wit
 				"witness", c.witnesses[e.WitnessIndex],
 				"err", err)
 			witnessesToRemove = append(witnessesToRemove, e.WitnessIndex)
+			c.witnesses[e.WitnessIndex].MalevolentProvider(e.peer)
 		default: // benign errors can be ignored with the exception of context errors
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return err
