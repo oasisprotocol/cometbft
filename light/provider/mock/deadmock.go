@@ -24,6 +24,12 @@ func (p *deadMock) LightBlock(_ context.Context, height int64) (*types.LightBloc
 	return nil, provider.ErrNoResponse
 }
 
+func (p *deadMock) LightBlockWithPeerID(_ context.Context, height int64) (*types.LightBlock, string, error) {
+	return nil, "", provider.ErrNoResponse
+}
+
+func (p *deadMock) MalevolentProvider(peerID string) {}
+
 func (p *deadMock) ReportEvidence(_ context.Context, ev types.Evidence) error {
 	return provider.ErrNoResponse
 }
