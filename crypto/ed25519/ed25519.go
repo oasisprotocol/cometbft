@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 	"io"
 
-	"github.com/oasisprotocol/ed25519"
+	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
 
 	"github.com/cometbft/cometbft/crypto"
 	"github.com/cometbft/cometbft/crypto/tmhash"
@@ -155,7 +155,7 @@ func (pubKey PubKey) VerifySignature(msg []byte, sig []byte) bool {
 	if oasisDomainSeparatorEnabled {
 		return oasisVerifyBytesContext(pubKey, msg, sig)
 	}
-	return ed25519.Verify(ed25519.PublicKey(pubKey), msg, sig)
+	return CachingVerifier.VerifyWithOptions(ed25519.PublicKey(pubKey), msg, sig, verifyOptionsOasis)
 }
 
 func (pubKey PubKey) Type() string {
@@ -168,4 +168,22 @@ func (pubKey PubKey) Equals(other crypto.PubKey) bool {
 	}
 
 	return false
+}
+
+func VerifyBatch(pubKeys []ed25519.PublicKey, msgs, sigs [][]byte) ([]bool, error) {
+	batchVerifier := ed25519.NewBatchVerifierWithCapacity(len(msgs))
+
+	for i := range pubKeys {
+		CachingVerifier.AddWithOptions(
+			batchVerifier,
+			pubKeys[i],
+			msgs[i],
+			sigs[i],
+			verifyOptionsOasis,
+		)
+	}
+
+	_, validSigs := batchVerifier.Verify(nil)
+
+	return validSigs, nil
 }
