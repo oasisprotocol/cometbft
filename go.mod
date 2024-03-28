@@ -52,7 +52,7 @@ require (
 	github.com/cosmos/gogoproto v1.4.1
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/golang/protobuf v1.5.3
-	github.com/oasisprotocol/ed25519 v0.0.0-20210505154701-76d8c688d86e
+	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a
 	github.com/oasisprotocol/safeopen v0.0.0-20200528085122-e01cfdfc7661
 	github.com/vektra/mockery/v2 v2.14.0
 	golang.org/x/sync v0.5.0

@@ -3,7 +3,8 @@ package ed25519
 import (
 	"crypto/sha512"
 
-	"github.com/oasisprotocol/ed25519"
+	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519"
+	"github.com/oasisprotocol/curve25519-voi/primitives/ed25519/extra/cache"
 )
 
 // This file adds the helpers for forcing Tendermint to use oasis-core's
@@ -23,7 +24,22 @@ var (
 	oasisDomainSeparator        string
 	oasisDomainSeparatorEnabled bool
 
-	defaultOptions ed25519.Options
+	// Oasis Protocol uses a very specific definition of Ed25519pure that
+	// is slightly different from everyone else.
+	verifyOptionsOasis = &ed25519.Options{
+		Verify: &ed25519.VerifyOptions{
+			AllowSmallOrderA:   false,
+			AllowSmallOrderR:   false,
+			AllowNonCanonicalA: true,
+			AllowNonCanonicalR: true,
+		},
+	}
+
+	// CachingVerifier stores the decompressed public keys to accelerate
+	// repeated signature verification with the same public keys.
+	CachingVerifier = cache.NewVerifier(
+		cache.NewLRUCache(4096), // Should be big enough?
+	)
 )
 
 // EnableOasisDomainSeparation enables oasis-core's ad-hoc domain-separated
@@ -49,7 +65,7 @@ func oasisSignContext(privKey PrivKey, msg []byte) ([]byte, error) {
 
 func oasisVerifyBytesContext(pubKey PubKey, msg, sig []byte) bool {
 	prehash := oasisDomainSeparationPrehash(msg)
-	return ed25519.Verify(ed25519.PublicKey(pubKey), prehash, sig)
+	return CachingVerifier.VerifyWithOptions(ed25519.PublicKey(pubKey), prehash, sig, verifyOptionsOasis)
 }
 
 func OasisVerifyBatchContext(nativePubKeys []ed25519.PublicKey, msgs, sigs [][]byte) ([]bool, error) {
@@ -57,9 +73,7 @@ func OasisVerifyBatchContext(nativePubKeys []ed25519.PublicKey, msgs, sigs [][]b
 	for _, v := range msgs {
 		prehashes = append(prehashes, oasisDomainSeparationPrehash(v))
 	}
-
-	_, validSigs, err := ed25519.VerifyBatch(nil, nativePubKeys, prehashes, sigs, &defaultOptions)
-	return validSigs, err
+	return VerifyBatch(nativePubKeys, prehashes, sigs)
 }
 
 func oasisDomainSeparationPrehash(message []byte) []byte {
