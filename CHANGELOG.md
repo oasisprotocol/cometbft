@@ -6,6 +6,12 @@
 
 ### BUG FIXES
 
+- `[evidence]` Add validation for Light Client Attack evidence ByzantineValidators
+  ([\#5638](https://github.com/cometbft/cometbft/pull/5638))
+
+- `[light]`: stop witness comparison after divergence checks
+  ([\#5820](https://github.com/cometbft/cometbft/pull/5820))
+
 ### IMPROVEMENTS
 - `[statesync]` Add configurable `max-snapshot-chunks` parameter to validate max amount of chunks in a `SnapshotResponse`.
   ([\#5549](https://github.com/cometbft/cometbft/pull/5549))
