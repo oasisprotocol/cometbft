@@ -20,6 +20,9 @@
 
 ### BUG-FIXES
 
+- `[consensus]` Reject oversized proposals
+  ([\#5324](https://github.com/cometbft/cometbft/pull/5324))
+
 ### STATE-BREAKING
 
 ### API-BREAKING
